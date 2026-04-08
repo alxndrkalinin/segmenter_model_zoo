@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Union
 from glob import glob
 from skimage.measure import label
-from aicsimageio.writers import OmeTiffWriter
+import tifffile as tiff
 import re
 from collections import Counter
 
@@ -71,10 +71,7 @@ def save_as_uint(
     if not save_path.exists():
         save_path.mkdir(parents=True)
 
-    with OmeTiffWriter(
-        save_path / f"{core_fn}_{tag}.tiff", overwrite_file=overwrite
-    ) as writer:
-        writer.save(img)
+    tiff.imwrite(str(save_path / f"{core_fn}_{tag}.tiff"), img)
 
 
 def load_filenames(data_config):

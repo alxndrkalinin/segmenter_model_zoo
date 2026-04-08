@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import os
-import quilt3
 from pathlib import Path
 from typing import List, Union
 
@@ -12,6 +11,7 @@ class QuiltModelZoo:
 
     def __init__(self):
         """connect to model zoo on quilt3"""
+        import quilt3
 
         # connect to quilt
         self.pkg = quilt3.Package.browse(

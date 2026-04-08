@@ -3,7 +3,6 @@ from pathlib import Path
 import numpy as np
 from skimage.morphology import remove_small_objects
 from aicsmlsegment.utils import background_sub, simple_norm
-from aicsimageio import AICSImage
 
 
 def SegModule(

@@ -2,7 +2,6 @@ import numpy as np
 from typing import List, Union
 from pathlib import Path
 from aicsmlsegment.utils import simple_norm
-from aicsimageio import AICSImage
 
 
 def SegModule(

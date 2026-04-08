@@ -10,8 +10,6 @@ import torch
 from torch.autograd import Variable
 from aicsmlsegment.utils import input_normalization
 from scipy.ndimage import zoom
-from aicsimageio import AICSImage
-
 from segmenter_model_zoo.quilt_utils import validate_model
 
 ###############################################################################
@@ -352,6 +350,7 @@ class SegModel:
             if not isinstance(inputCh, List):
                 inputCh = [inputCh]
 
+            from aicsimageio import AICSImage
             reader = AICSImage(filename)
             input_img = reader.get_image_data("CZYX", C=inputCh, S=0, T=0)
             input_img = input_img.astype(np.float32)
@@ -572,6 +571,7 @@ class SuperModel:
             assert os.path.exists(filename), f"{filename} does not exist"
             assert inputCh is not None, "input channel must be provided"
 
+            from aicsimageio import AICSImage
             reader = AICSImage(filename)
             input_img = reader.get_image_data("CZYX", S=0, T=0, C=inputCh)
 
