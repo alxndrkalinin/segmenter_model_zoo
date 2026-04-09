@@ -1,25 +1,28 @@
 import os
-import numpy as np
 from typing import List, Union
 from pathlib import Path
-from aicsimageio import AICSImage
-from scipy.ndimage.morphology import binary_fill_holes
-from skimage.morphology import ball, dilation, disk, binary_closing
-from skimage.morphology import remove_small_objects
-from skimage.measure import label
-from skimage.segmentation import relabel_sequential, find_boundaries
-from aicsmlsegment.utils import background_sub, simple_norm
-import itk
 
-from cell_detector import detect
-from segmenter_model_zoo.quilt_utils import QuiltModelZoo
+import numpy as np
+from scipy.ndimage import binary_fill_holes
+from skimage.measure import label
+from skimage.morphology import (
+    ball,
+    disk,
+    dilation,
+    binary_closing,
+    remove_small_objects,
+)
+from aicsmlsegment.utils import simple_norm, background_sub
+from skimage.segmentation import find_boundaries, relabel_sequential
+
 from segmenter_model_zoo.utils import (
     getLargestCC,
     prune_cell_pairs,
-    find_strongest_associate,
     find_multi_assignment,
     exist_double_assignment,
+    find_strongest_associate,
 )
+from segmenter_model_zoo.quilt_utils import QuiltModelZoo
 
 flat_se = np.zeros((5, 5, 5), dtype=np.uint8)
 flat_se[2, :, :] = 1
@@ -55,7 +58,7 @@ def SegModule(
     two-camera pipeline setting.
 
 
-    Parameters:
+    Parameters
     ----------
     img: np.ndarray
         a 4D numpy array of size 2 x Z x Y x X, the first channel is DNA
@@ -115,10 +118,11 @@ def SegModule(
         two numpy arrays: cell segmentatino and dna segmentation (labeled images) or
         together with raw prediction (if return_prediction is True)
     """
-
     # check image data
     if img is None:
         # load the image
+        from aicsimageio import AICSImage
+
         reader = AICSImage(filename)
         img = reader.data[0, index, :, :, :]
 
@@ -197,17 +201,17 @@ def SegModule(
     mem_bf_trust[mem_bf_pred > mem_bf_cut] = 1
     mem_pred = mem_pred + mem_bf_trust * 0.1
 
-    mem_bf_trust_1 = dilation(mem_bf_trust > 0, selem=flat_se)
+    mem_bf_trust_1 = dilation(mem_bf_trust > 0, footprint=flat_se)
     mem_bf_trust_1 = mem_bf_trust_1.astype(np.uint8)
     mem_bf_trust_1[mem_bf_trust_1 > 0] = 1
     mem_pred = mem_pred + mem_bf_trust_1 * 0.1
 
-    mem_bf_trust_2 = dilation(mem_bf_trust_1 > 0, selem=flat_se)
+    mem_bf_trust_2 = dilation(mem_bf_trust_1 > 0, footprint=flat_se)
     mem_bf_trust_2 = mem_bf_trust_2.astype(np.uint8)
     mem_bf_trust_2[mem_bf_trust_2 > 0] = 1
     mem_pred = mem_pred + mem_bf_trust_2 * 0.1
 
-    mem_bf_trust_3 = dilation(mem_bf_trust_2 > 0, selem=flat_se)
+    mem_bf_trust_3 = dilation(mem_bf_trust_2 > 0, footprint=flat_se)
     mem_bf_trust_3 = mem_bf_trust_3.astype(np.uint8)
     mem_bf_trust_3[mem_bf_trust_3 > 0] = 1
     mem_pred = mem_pred + mem_bf_trust_3 * 0.1
@@ -216,7 +220,7 @@ def SegModule(
     tmp_mem = mem_pred > mem_pre_cut_th
     for zz in range(tmp_mem.shape[0]):
         if np.any(tmp_mem[zz, :, :]):
-            tmp_mem[zz, :, :] = dilation(tmp_mem[zz, :, :], selem=disk(1))
+            tmp_mem[zz, :, :] = dilation(tmp_mem[zz, :, :], footprint=disk(1))
 
     # cut seed
     seed_bw[tmp_mem > 0] = 0
@@ -335,6 +339,10 @@ def SegModule(
     # part 6: get cell instance segmentation
     ################################################################
     # cell_seg = watershed(mem_pred, seed_label, watershed_line=True)
+    from segmenter_model_zoo.utils import import_itk
+
+    itk = import_itk()
+
     raw0 = mem_pred.astype(np.float32)
     raw_itk = itk.GetImageFromArray(raw0)
     seed_itk = itk.GetImageFromArray(seed_label.astype(np.int16))
@@ -513,6 +521,8 @@ def SegModule(
     # ###############################################################
 
     # first, load the trained object detection model
+    from cell_detector import detect
+
     _tmp_dir = str(model_list[-1])
     _local_tmp = _tmp_dir + os.sep + "_tmp_cell_pair_detection_model.pth"
     _local_config_tmp = _tmp_dir + os.sep + "_tmp_cell_pair_detection_config.yaml"
@@ -541,7 +551,6 @@ def SegModule(
 
     # check if any potential pairs
     if len(rois_array) > 0:
-
         # extract the coordinates and confidence score of each box
         roi_list = rois_array[0]
         roi_score = rois_array[1].tolist()
@@ -554,7 +563,6 @@ def SegModule(
         cell_pairs_score = []
         cell_pairs_aux_score = []
         for roi2d_index, roi2d in enumerate(roi_list):
-
             # crop out the nuc seg within the box and get ID of candidate cells
             # there may be more than 2 IDs
             nuc_crop = nuc_mip[roi2d[1] : roi2d[3], roi2d[0] : roi2d[2]]
@@ -723,7 +731,7 @@ def SegModule(
                 mem_seg = np.logical_or(
                     cell_seg == pair_ids[0], cell_seg == pair_ids[1]
                 )
-                mem_seg = binary_closing(mem_seg, selem=ball(3))
+                mem_seg = binary_closing(mem_seg, footprint=ball(3))
 
                 cell_seg[mem_seg > 0] = pair_ids[0]
                 dna_mask_label[nuc_seg > 0] = pair_ids[0]

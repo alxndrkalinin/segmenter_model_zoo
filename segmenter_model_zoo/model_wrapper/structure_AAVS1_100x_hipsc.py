@@ -1,6 +1,7 @@
-import numpy as np
 from typing import List, Union
 from pathlib import Path
+
+import numpy as np
 from aicsmlsegment.utils import simple_norm
 
 
@@ -15,8 +16,7 @@ def SegModule(
     """
     Segmentation function for CAAX segmentation.
 
-
-    Parameters:
+    Parameters
     ----------
     img: np.ndarray
         a 4D numpy array of size 1 x Z x Y x X of CAAX image
@@ -38,11 +38,14 @@ def SegModule(
     ------------
         one numpy array or together with raw prediction (if return_prediction is True)
     """
-
     if img is None:
         # load the image
-        reader = AICSImage(filename)
-        img = reader.data[0, index, :, :, :]
+        import tifffile
+
+        img_raw = np.squeeze(tifffile.imread(filename))
+        if img_raw.ndim == 3:
+            img_raw = np.expand_dims(img_raw, axis=0)
+        img = img_raw[index]
 
     # make sure the image has 4 dimensions
     assert len(img.shape) == 4

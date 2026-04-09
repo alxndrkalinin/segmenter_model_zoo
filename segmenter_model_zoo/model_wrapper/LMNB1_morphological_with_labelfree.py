@@ -1,15 +1,13 @@
 import sys
 from typing import List, Union
 from pathlib import Path
-from scipy.ndimage.morphology import binary_fill_holes
-from scipy.ndimage import gaussian_filter
-import itk
+
 import numpy as np
-from skimage.morphology import remove_small_objects
+from scipy.ndimage import gaussian_filter, binary_fill_holes
 from skimage.measure import label
+from skimage.morphology import remove_small_objects
+from aicsmlsegment.utils import simple_norm, background_sub
 from skimage.segmentation import find_boundaries
-from aicsmlsegment.utils import background_sub, simple_norm
-from aicsimageio import AICSImage
 
 mitosis_cutoff = 0.5  # 0.3
 core_cutoff = 0.5
@@ -33,7 +31,7 @@ def SegModule(
     segmented to be a fully closed shell (i.e. topologically fillable in 3D)
 
 
-    Parameters:
+    Parameters
     ----------
     img: np.ndarray
         a 4D numpy array of size 2 x Z x Y x X, the first channel is lamin b1
@@ -64,10 +62,11 @@ def SegModule(
         1 or 3 numpy array (depending on output_type) or together with raw
         prediction (if return_prediction is True)
     """
-
     # model order: mitosis, fill, core, mem_edge_lf
     if img is None:
         # load the image
+        from aicsimageio import AICSImage
+
         reader = AICSImage(filename)
         img = reader.data[0, index, :, :, :]
 
@@ -126,6 +125,10 @@ def SegModule(
     # do watershed
     seed, seed_num = label(core_bw, return_num=True)
     seed[cellmask_bw > 0] = seed_num + 1
+
+    from segmenter_model_zoo.utils import import_itk
+
+    itk = import_itk()
 
     raw_itk = itk.GetImageFromArray(mitosis_smooth)
     seed_itk = itk.GetImageFromArray(seed.astype(np.int16))

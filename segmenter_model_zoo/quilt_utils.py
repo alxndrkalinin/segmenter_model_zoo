@@ -2,15 +2,15 @@
 # -*- coding: utf-8 -*-
 
 import os
-from pathlib import Path
 from typing import List, Union
+from pathlib import Path
 
 
 class QuiltModelZoo:
     """download model from quilt"""
 
     def __init__(self):
-        """connect to model zoo on quilt3"""
+        """Connect to model zoo on quilt3"""
         import quilt3
 
         # connect to quilt
@@ -20,7 +20,7 @@ class QuiltModelZoo:
         self.meta = self.pkg["metadata.csv"]()
 
     def peak_all_models(self) -> List:
-        """print out names of existing models in the model zoo"""
+        """Print out names of existing models in the model zoo"""
         models = list(self.meta.name)
         print(models)
         return models
@@ -29,7 +29,7 @@ class QuiltModelZoo:
         self, model_name: str, save_path: Union[str, Path] = "./zoo/model.pth"
     ):
         """
-        download the model "model_name" to "out_path"
+        Download the model "model_name" to "out_path"
 
         Paremeters
         ---
@@ -39,18 +39,18 @@ class QuiltModelZoo:
             the path to save the model, default is './zoo/model.pth'
         """
         # check if the model name is valide
-        assert model_name in list(
-            self.meta.name
-        ), f"requested model {model_name} does not exist"
+        assert model_name in list(self.meta.name), (
+            f"requested model {model_name} does not exist"
+        )
         # TODO: fix, using pathlib
         # check if save_path already has the model
         save_dir = os.path.dirname(save_path)
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
         else:
-            assert not os.path.exists(
-                save_path
-            ), f"the save_path {save_path} is already used"
+            assert not os.path.exists(save_path), (
+                f"the save_path {save_path} is already used"
+            )
 
         # fetch the model file
         model_id = self.meta[self.meta["name"] == model_name]["models"].iloc[0]
@@ -59,7 +59,7 @@ class QuiltModelZoo:
 
 
 def validate_model(model_name, save_path):
-    """check if model exists, otherwise download it"""
+    """Check if model exists, otherwise download it"""
     model_path = save_path + os.sep + model_name + ".pth"
     if not os.path.exists(model_path):
         zoo_client = QuiltModelZoo()

@@ -2,19 +2,21 @@
 This sample script will get deployed in the bin directory of the
 users' virtualenv when the parent module is installed using pip.
 """
+
 import os
-import argparse
-import logging
 import sys
+import logging
+import argparse
 import traceback
-from pathlib import Path, PurePosixPath
 from typing import List
-from tqdm import tqdm
+from pathlib import Path, PurePosixPath
+
 import yaml
 import numpy as np
+from tqdm import tqdm
 
 from segmenter_model_zoo.zoo import SuperModel
-from segmenter_model_zoo.utils import load_filenames, save_as_uint
+from segmenter_model_zoo.utils import save_as_uint, load_filenames
 
 ###############################################################################
 
@@ -89,7 +91,7 @@ class Seg3DStacks(object):
                         continue
                 else:
                     # do exact match
-                    check_name = save_path / f"{fn_core}_{self.search_tag}.tiff"
+                    check_name = save_path / f"{fn_core}_{self.tag}.tiff"
                     if check_name.exists():
                         print(f"{check_name} exists, skipping")
                         continue
@@ -123,7 +125,8 @@ def main():
         args = Args()
         dbg = args.debug
         print(args.config)
-        config = yaml.load(open(args.config, "r"))
+        with open(args.config, "r") as f:
+            config = yaml.safe_load(f)
         all_files, timelapse_flag = load_filenames(config["Data"])
         print(all_files)
 

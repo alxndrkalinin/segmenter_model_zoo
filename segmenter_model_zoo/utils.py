@@ -1,14 +1,27 @@
-import numpy as np
-
-import sys
 import os
-from pathlib import Path
-from typing import Union
-from glob import glob
-from skimage.measure import label
-import tifffile as tiff
 import re
+import sys
+from glob import glob
+from typing import Union
+from pathlib import Path
 from collections import Counter
+
+import numpy as np
+import tifffile as tiff
+
+
+def import_itk():
+    """Import itk with a clear error message if not installed."""
+    try:
+        import itk
+
+        return itk
+    except ImportError:
+        raise ImportError(
+            "itk is required for this model wrapper. "
+            "Install with: pip install segmenter-model-zoo[itk]"
+        ) from None
+from skimage.measure import label
 
 
 ################################################################################
@@ -16,7 +29,7 @@ from collections import Counter
 ################################################################################
 def getLargestCC(labels, is_label=True):
     """
-    return the largest connect component from a label image or a binary image
+    Return the largest connect component from a label image or a binary image
     """
     if is_label:
         largestCC = labels == np.argmax(np.bincount(labels.flat)[1:]) + 1
@@ -38,11 +51,11 @@ def save_as_uint(
     tag: str = "segmentation",
 ):
     """
-    save the segmentation to disk as uint type
+    Save the segmentation to disk as uint type
     (either 8-bit or 16-bit depending on data)
 
     Parameters
-    ---
+    ----------
     img: np.ndarray
         the image to save
 
@@ -59,7 +72,6 @@ def save_as_uint(
         the tag to be added to the end of output filename
         default is "segmentation"
     """
-
     # find the minimal bit
     if img.max() < 255:
         img = img.astype(np.uint8)
@@ -76,7 +88,7 @@ def save_as_uint(
 
 def load_filenames(data_config):
     """
-    load the filenames of all the images need to be processed based on config.
+    Load the filenames of all the images need to be processed based on config.
     Three types of loading are currently supported:
     - "folder"
         * two parameters are required: "dir" and "search". Basically, we just
@@ -92,12 +104,10 @@ def load_filenames(data_config):
         csv pointed by "file", all filenames in the column defined by "column"
         will be identified as files to be processed.
     """
-
     all_stacks = []
     all_timelapse = []
     for data_item in data_config:
         if data_item["item"] == "folder":
-
             if data_item["search"] == "*":
                 filenames = glob(data_item["dir"] + os.sep + "/*")
             else:
@@ -156,8 +166,7 @@ def load_filenames(data_config):
 # util functions for dna and cell segmentations
 ################################################################################
 def bb_intersection_over_union(boxA, boxB):
-    """computer IOU of two bounding boxes"""
-
+    """Computer IOU of two bounding boxes"""
     # determine the (x, y)-coordinates of the intersection rectangle
     xA = max(boxA[1], boxB[1])
     yA = max(boxA[0], boxB[0])
@@ -181,8 +190,7 @@ def bb_intersection_over_union(boxA, boxB):
 
 
 def find_strongest_associate(main_score, aux_score):
-    """find the most likely pair from all candidate in one bounding box"""
-
+    """Find the most likely pair from all candidate in one bounding box"""
     # collect confidence score of all candidates
     score = []
     for ii in range(len(main_score)):
@@ -195,8 +203,7 @@ def find_strongest_associate(main_score, aux_score):
 
 
 def exist_double_assignment(cell_pairs):
-    """check if one object is associated with multiple pairs"""
-
+    """Check if one object is associated with multiple pairs"""
     nodes = set(x for ll in cell_pairs for x in ll)
     num_node = len(nodes)
     num_pair = len(cell_pairs)
@@ -205,8 +212,7 @@ def exist_double_assignment(cell_pairs):
 
 
 def find_multi_assignment(cell_pairs):
-    """find all multi-assignment"""
-
+    """Find all multi-assignment"""
     nodes = [x for ll in cell_pairs for x in ll]
     node_count = Counter(nodes)
     simple_pair = []
@@ -223,8 +229,7 @@ def find_multi_assignment(cell_pairs):
 
 
 def prune_cell_pairs(multi_pair, current_best_pair):
-    """update candidates after taking out one pair"""
-
+    """Update candidates after taking out one pair"""
     p_best = multi_pair[current_best_pair]
     idx_to_remove = []
     for idx, p in enumerate(multi_pair):

@@ -1,14 +1,12 @@
-import numpy as np
 from typing import List, Union
 from pathlib import Path
-from aicsimageio import AICSImage
-from scipy.ndimage.morphology import binary_fill_holes
-from skimage.morphology import dilation, disk
-from skimage.morphology import remove_small_objects
+
+import numpy as np
+from scipy.ndimage import binary_fill_holes
 from skimage.measure import label
-from skimage.segmentation import relabel_sequential, find_boundaries
-from aicsmlsegment.utils import background_sub, simple_norm
-import itk
+from skimage.morphology import disk, dilation, remove_small_objects
+from aicsmlsegment.utils import simple_norm, background_sub
+from skimage.segmentation import find_boundaries, relabel_sequential
 
 from segmenter_model_zoo.utils import getLargestCC
 
@@ -29,7 +27,7 @@ def SegModule(
     and mitotic pair correction.
 
 
-    Parameters:
+    Parameters
     ----------
     img: np.ndarray
         a 4D numpy array of size 2 x Z x Y x X, the first channel is DNA
@@ -71,10 +69,11 @@ def SegModule(
         two numpy arrays: cell segmentatino and dna segmentation (labeled images) or
         together with raw prediction (if return_prediction is True)
     """
-
     # model order: dna_mask, cellmask, dna_seed
     if img is None:
         # load the image
+        from aicsimageio import AICSImage
+
         reader = AICSImage(filename)
         img = reader.data[0, index, :, :, :]
     # make sure the image has 4 dimensions
@@ -141,7 +140,7 @@ def SegModule(
     tmp_mem = mem_pred > mem_pre_cut_th
     for zz in range(tmp_mem.shape[0]):
         if np.any(tmp_mem[zz, :, :]):
-            tmp_mem[zz, :, :] = dilation(tmp_mem[zz, :, :], selem=disk(1))
+            tmp_mem[zz, :, :] = dilation(tmp_mem[zz, :, :], footprint=disk(1))
 
     # cut seed
     seed_bw[tmp_mem > 0] = 0
@@ -210,6 +209,10 @@ def SegModule(
     # part 6: get cell instance segmentation
     ################################################################
     # cell_seg = watershed(mem_pred, seed_label, watershed_line=True)
+    from segmenter_model_zoo.utils import import_itk
+
+    itk = import_itk()
+
     raw0 = mem_pred.astype(np.float32)
     raw_itk = itk.GetImageFromArray(raw0)
     seed_itk = itk.GetImageFromArray(seed_label.astype(np.int16))

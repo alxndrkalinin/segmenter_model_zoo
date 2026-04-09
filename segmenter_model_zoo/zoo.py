@@ -1,15 +1,16 @@
 import os
 import sys
 import logging
-import numpy as np
-from typing import List, Union, Dict
-from pathlib import Path
 import importlib
+from typing import Dict, List, Union
+from pathlib import Path
 
+import numpy as np
 import torch
+from scipy.ndimage import zoom
 from torch.autograd import Variable
 from aicsmlsegment.utils import input_normalization
-from scipy.ndimage import zoom
+
 from segmenter_model_zoo.quilt_utils import validate_model
 
 ###############################################################################
@@ -171,13 +172,15 @@ class SegModel:
         self.model = self.model.to(gpu_id)
 
     def load_train(
-        self, checkpoint_name: str, model_param: Dict = {"local_path": "./"}
+        self, checkpoint_name: str, model_param: Dict = None
     ):
+        if model_param is None:
+            model_param = {"local_path": "./"}
         """
-        load a trained model
+        Load a trained model
 
         Parameters
-        -------------
+        ----------
         checkpoint_name: str
             the name of the model, use list_all_trained_models() to get
             a list of all current models
@@ -189,7 +192,6 @@ class SegModel:
             the model will be downloaded from quilt and save at "local_path"
             (default is the current working directory).
         """
-
         if not (checkpoint_name in CHECKPOINT_PATH_MAPPING):
             raise IOError(f"Checkpoint '{checkpoint_name}' does not exist")
 
@@ -269,7 +271,9 @@ class SegModel:
                 # model path to load everything
                 model_path = CHECKPOINT_PATH_MAPPING[checkpoint_name]["path"]
 
-            state = torch.load(model_path, map_location=torch.device("cpu"))
+            state = torch.load(
+                model_path, map_location=torch.device("cpu"), weights_only=False
+            )
             if "model_state_dict" in state:
                 self.model.load_state_dict(state["model_state_dict"])
             else:
@@ -282,13 +286,13 @@ class SegModel:
 
     def get_cutoff(self):
         """
-        load the cutoff value to be applied on the prediction
+        Load the cutoff value to be applied on the prediction
         """
         return self.cutoff
 
     def list_all_trained_models(self):
         """
-        print all current models
+        Print all current models
         """
         for key, value in CHECKPOINT_PATH_MAPPING.items():
             print(key)
@@ -301,13 +305,13 @@ class SegModel:
         normalization: int = None,
         already_normalized: bool = False,
         cutoff: float = None,
-        inference_param: Dict = {},
+        inference_param: Dict = None,
     ) -> np.ndarray:
         """
         Apply a trained model on an image
 
-        Parameters:
-        ------------
+        Parameters
+        ----------
         input_img: np.ndarray
             the image to be applied can be passed in as a numpy array
         filename:  str
@@ -338,6 +342,8 @@ class SegModel:
         output_img: np.ndarray
             the segmentation result
         """
+        if inference_param is None:
+            inference_param = {}
 
         # set cudnn
         torch.backends.cudnn.enabled = True
@@ -350,9 +356,12 @@ class SegModel:
             if not isinstance(inputCh, List):
                 inputCh = [inputCh]
 
-            from aicsimageio import AICSImage
-            reader = AICSImage(filename)
-            input_img = reader.get_image_data("CZYX", C=inputCh, S=0, T=0)
+            import tifffile
+
+            img_raw = np.squeeze(tifffile.imread(filename))
+            if img_raw.ndim == 3:
+                img_raw = np.expand_dims(img_raw, axis=0)
+            input_img = img_raw[inputCh]
             input_img = input_img.astype(np.float32)
         else:
             input_img = input_img.astype(np.float32)
@@ -429,9 +438,9 @@ class SegModel:
                         ]
                         input_img_tensor = torch.from_numpy(input_patch)
                         tmp_out = model(Variable(input_img_tensor.cuda()).unsqueeze(0))
-                        assert len(self.OutputCh) // 2 <= len(
-                            tmp_out
-                        ), "the parameter OutputCh not compatible with output tensors"
+                        assert len(self.OutputCh) // 2 <= len(tmp_out), (
+                            "the parameter OutputCh not compatible with output tensors"
+                        )
 
                         label = tmp_out[self.OutputCh[0]]
                         prob = self.softmax(label)
@@ -470,12 +479,14 @@ class SegModel:
 
 
 class SuperModel:
-    def __init__(self, model_name: str, model_param: Dict = {"local_path": "./"}):
+    def __init__(self, model_name: str, model_param: Dict = None):
+        if model_param is None:
+            model_param = {"local_path": "./"}
         """
         Define a SuperModel
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         model_name: str
             the name of the super model
         model_param: Dict
@@ -490,7 +501,6 @@ class SuperModel:
             the models will be downloaded from quilt and saved at
             "local_path" (default is the current working directory).
         """
-
         assert "local_path" in model_param, "local_path is required"
         # TODO: allow hard-coded model path to skip local_path
         model_local_path = model_param["local_path"]
@@ -541,14 +551,14 @@ class SuperModel:
         self,
         input_img: np.ndarray = None,
         filename: Union[str, Path] = None,
-        inputCh: List = [0],
+        inputCh: List = None,
         **kwargs,
     ) -> Union[np.ndarray, List]:
         """
         Appply a super model on one image
 
-        Parameters:
-        --------------
+        Parameters
+        ----------
         input_img: np.ndarray
             the image to be segmented, if it is not None, filename and inputCh
             will not be used. Otherwise, use filename and inputCh to read image
@@ -565,15 +575,19 @@ class SuperModel:
         output: Union[np.ndarray, List]
             the segmentation result
         """
+        if inputCh is None:
+            inputCh = [0]
 
         # check data
         if input_img is None:
             assert os.path.exists(filename), f"{filename} does not exist"
-            assert inputCh is not None, "input channel must be provided"
 
-            from aicsimageio import AICSImage
-            reader = AICSImage(filename)
-            input_img = reader.get_image_data("CZYX", S=0, T=0, C=inputCh)
+            import tifffile
+
+            img_raw = np.squeeze(tifffile.imread(filename))
+            if img_raw.ndim == 3:
+                img_raw = np.expand_dims(img_raw, axis=0)
+            input_img = img_raw[inputCh]
 
         # make sure it is float32
         input_img = input_img.astype(np.float32)
@@ -588,9 +602,8 @@ class SuperModel:
 
 def list_all_super_models(item: str = "all"):
     """
-    print all available super models
+    Print all available super models
     """
-
     """
     if len(sys.argv) == 2:
         print(SUPER_MODEL_MAPPING[sys.argv[1]]["instruction"])
